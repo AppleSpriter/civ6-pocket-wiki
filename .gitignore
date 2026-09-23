@@ -1,0 +1,11 @@
+.DS_Store
+*.apk
+civ6-pocket/.openai/
+**/__pycache__/
+**/*.pyc
+android-app/.gradle/
+android-app/app/build/
+android-app/local.properties
+android-app/signing/
+*.keystore
+*.jks

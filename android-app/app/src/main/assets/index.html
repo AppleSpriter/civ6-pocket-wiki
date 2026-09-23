@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#102c3a">
+  <meta name="description" content="文明 6 口袋百科：查科技树、文化树、奇观、地形资源、城邦、单位、建筑、领袖与伟人。">
+  <title>文明 6 · 口袋百科</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23102c3a'/%3E%3Cpath d='M13 44 32 13l19 31H13Zm12 0 7-13 7 13' fill='none' stroke='%23d9b56d' stroke-width='5' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./style.css">
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">VI</span><span>文明 6 <b>口袋百科</b></span></div>
+      <span class="signature-watermark" aria-label="制作：Applespriter">Applespriter</span>
+      <span class="edition">风云变幻规则集 · 含 DLC</span>
+    </header>
+    <main>
+      <section class="toolbar" aria-label="查找百科条目">
+        <div class="toolbar-copy"><p class="eyebrow">CIVILIZATION VI / FIELD GUIDE</p><h1>查解锁、看前置、定路线。</h1></div>
+        <label class="search-field"><span class="search-icon" aria-hidden="true">⌕</span><span class="sr-only">搜索百科</span><input id="search" type="search" placeholder="搜索科技、奇观、单位、政策卡…" autocomplete="off"></label>
+      </section>
+      <nav class="tabs" aria-label="百科分类">
+        <button type="button" data-view="tech" class="active" aria-selected="true"><span>◇</span>科技树</button>
+        <button type="button" data-view="civic" aria-selected="false"><span>▧</span>文化树</button>
+        <button type="button" data-view="wonder" aria-selected="false"><span>✦</span>奇观</button>
+        <button type="button" data-view="map" aria-selected="false"><span>◇</span>地图</button>
+        <button type="button" data-view="unlock" aria-selected="false"><span>⬡</span>其他解锁</button>
+        <button type="button" data-view="leader" aria-selected="false"><span>♛</span>领袖</button>
+        <button type="button" data-view="citystate" aria-selected="false"><span>◈</span>城邦</button>
+        <button type="button" data-view="greatperson" aria-selected="false"><span>✧</span>伟人</button>
+        <button type="button" data-view="concept" aria-selected="false"><span>☷</span>机制</button>
+      </nav>
+      <div class="section-head"><div><p class="eyebrow" id="section-kicker">研究路线</p><h2 id="section-title">科技树</h2></div><p id="section-count" aria-live="polite">正在载入资料…</p></div>
+      <div id="error" class="error" hidden>资料暂时无法载入。请刷新页面重试。</div>
+      <div class="content-layout">
+        <section id="workspace" class="workspace" aria-label="百科内容"><div class="loading">正在载入百科资料…</div></section>
+        <aside id="detail" class="detail-panel" aria-label="条目详情"></aside>
+      </div>
+    </main>
+    <footer>资料依据文明百科的“风云变幻”规则集整理。游戏速度、资料片与模式会影响实际数值。<span class="footer-signature">制作：Applespriter</span></footer>
+  </div>
+  <div id="detail-backdrop" class="detail-backdrop" hidden></div>
+</body>
+</html>
