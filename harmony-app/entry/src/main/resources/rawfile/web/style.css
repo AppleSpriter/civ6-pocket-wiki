@@ -182,3 +182,10 @@
 .tree-legend span::before{content:"";width:9px;height:9px;border-radius:3px;background:currentColor}
 .legend-current{color:#f1cf83}.legend-before{color:#77d5dc}.legend-after{color:#bea7f4}
 .tree-status{font-size:12px;color:#b5cbce;margin:0 0 12px;line-height:1.5;min-height:18px}
+.tree-card.selected,.tree-card.selected:hover{background:linear-gradient(135deg,#61542c,#2b3d3c);border-color:#f1cf83}
+.tree-card.ancestor,.tree-card.ancestor:hover{background:linear-gradient(135deg,#176c7b,#143f4d);border-color:#8ce9ef;border-left-width:4px;box-shadow:0 0 0 2px #8ce9ef55}
+.tree-card.descendant,.tree-card.descendant:hover{background:linear-gradient(135deg,#58437b,#302e50);border-color:#bea7f4}
+.tree-route-tag{position:absolute;top:-8px;right:8px;padding:2px 6px;border-radius:5px;background:#112b36;border:1px solid currentColor;color:#f1cf83;font-size:10px;line-height:1.35;font-weight:650;pointer-events:none}
+.tree-card.ancestor .tree-route-tag{color:#a7f3f7;background:#13424c}
+.tree-card.descendant .tree-route-tag{color:#dfd1ff;background:#302e50}
+.tree-card.selected .tree-route-tag{color:#ffe6a9;background:#4b4027}

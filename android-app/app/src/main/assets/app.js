@@ -395,6 +395,10 @@ function updateTreeHighlight(type) {
     card.classList.toggle('ancestor',relations.ancestors.has(id));
     card.classList.toggle('descendant',relations.descendants.has(id));
     card.setAttribute('aria-pressed',String(id===relations.focus));
+    const role=id===relations.focus?'current':relations.ancestors.has(id)?'before':relations.descendants.has(id)?'after':'none';
+    card.dataset.route=role;
+    const label=card.querySelector('.tree-route-tag');
+    if(label){label.hidden=role==='none';label.textContent=role==='before'?'前置':role==='after'?'后续':role==='current'?'当前':'';}
   }
   const status=$('#tree-status');
   if(status)status.textContent=relations.focus?`${getName(type,relations.focus)} · ${relations.ancestors.size} 项前置 · ${relations.descendants.size} 项后续`:"尚未选中路线";
@@ -437,7 +441,7 @@ function renderTree() {
   $("#section-count").textContent = `${list.length} 项研究路线`;
   $("#workspace").innerHTML = `${isPocket()?layoutControl:""}<p id="tree-help" class="summary-note">点按高亮前置和后续路线，再点同一节点取消；长按查看详情。</p><div class="tree-legend" aria-label="路线颜色说明"><span class="legend-current">当前节点</span><span class="legend-before">前置</span><span class="legend-after">后续</span></div><p id="tree-status" class="tree-status" aria-live="polite">尚未选中路线</p><div class="tree-scroll"><div class="tree-inner"><svg class="tree-edges" aria-hidden="true"></svg>${groups.map(group => `<div class="tree-column"><div class="tree-era">${esc(group.era)} <small>${group.entries.length} 项</small></div>${group.entries.map(item => {
     const wonders = item.unlocks.filter(unlock => unlock.category === "wonders" && unlock.id.startsWith("building_"));
-    return `<button type="button" class="tree-card" ${toneStyle(view,item)} data-tree-node="${view}:${esc(item.id)}" data-open="${view}:${esc(item.id)}" data-id="${esc(item.id)}" aria-pressed="false" aria-describedby="tree-help" aria-keyshortcuts="Alt+Enter"><span class="tree-card-title"><span class="tree-card-heading">${entryImage(item)}<span>${esc(item.name)}</span></span><span class="chev">›</span></span><span class="tree-card-meta">${item.cost ? `${item.cost} ${view==="tech"?"科技值":"文化值"}` : "研究项目"}${item.boost ? ` · ${esc(preview(item.boost,18))}` : ""}</span>${wonders.length ? `<span class="tree-card-unlock">✦ ${esc(wonders.map(x=>x.name).join(" · "))}</span>` : ""}</button>`;
+    return `<button type="button" class="tree-card" ${toneStyle(view,item)} data-tree-node="${view}:${esc(item.id)}" data-open="${view}:${esc(item.id)}" data-id="${esc(item.id)}" aria-pressed="false" aria-describedby="tree-help" aria-keyshortcuts="Alt+Enter"><span class="tree-route-tag" hidden></span><span class="tree-card-title"><span class="tree-card-heading">${entryImage(item)}<span>${esc(item.name)}</span></span><span class="chev">›</span></span><span class="tree-card-meta">${item.cost ? `${item.cost} ${view==="tech"?"科技值":"文化值"}` : "研究项目"}${item.boost ? ` · ${esc(preview(item.boost,18))}` : ""}</span>${wonders.length ? `<span class="tree-card-unlock">✦ ${esc(wonders.map(x=>x.name).join(" · "))}</span>` : ""}</button>`;
   }).join("")}</div>`).join("")}</div></div>`;
   const scroll = $(".tree-scroll");
   scroll.scrollLeft = oldScroll;
@@ -466,7 +470,7 @@ function drawEdges(type,relations=treeRelations(type)) {
     const before=!!relations.focus&&relations.ancestors.has(parentId)&&(item.id===relations.focus||relations.ancestors.has(item.id));
     const after=!!relations.focus&&(parentId===relations.focus||relations.descendants.has(parentId))&&relations.descendants.has(item.id);
     const direction=before?"before":after?"after":"none";
-    paths.push(`<path data-route="${direction}" d="M${x1.toFixed(1)} ${y1.toFixed(1)} C${mid.toFixed(1)} ${y1.toFixed(1)},${mid.toFixed(1)} ${y2.toFixed(1)},${x2.toFixed(1)} ${y2.toFixed(1)}" fill="none" stroke="${before?"#77d5dc":after?"#bea7f4":"#77979b"}" stroke-width="${before||after?2.5:1.2}" opacity="${(before||after)?0.9:0.23}"/>`);
+    paths.push(`<path data-route="${direction}" d="M${x1.toFixed(1)} ${y1.toFixed(1)} C${mid.toFixed(1)} ${y1.toFixed(1)},${mid.toFixed(1)} ${y2.toFixed(1)},${x2.toFixed(1)} ${y2.toFixed(1)}" fill="none" stroke="${before?"#8ce9ef":after?"#bea7f4":"#77979b"}" stroke-width="${before?3.5:after?2.5:1.2}" opacity="${(before||after)?0.95:0.23}"/>`);
   }
   svg.innerHTML = paths.join("");
 }
