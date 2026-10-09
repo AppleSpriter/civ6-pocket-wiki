@@ -1,0 +1,8 @@
+{
+  "modelVersion": "6.0.0",
+  "name": "civ6-pocket-harmony",
+  "version": "1.0.0",
+  "description": "Civilization VI offline pocket wiki for HarmonyOS",
+  "dependencies": {},
+  "devDependencies": {}
+}
