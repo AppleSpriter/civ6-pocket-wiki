@@ -1,6 +1,6 @@
 {
   "name": "civ6-pocket-harmony",
-  "version": "1.1.2",
+  "version": "1.1.4",
   "private": true,
   "dependencies": {
     "@ohos/hvigor": "6.26.8",

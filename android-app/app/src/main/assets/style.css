@@ -189,3 +189,7 @@
 .tree-card.ancestor .tree-route-tag{color:#a7f3f7;background:#13424c}
 .tree-card.descendant .tree-route-tag{color:#dfd1ff;background:#302e50}
 .tree-card.selected .tree-route-tag{color:#ffe6a9;background:#4b4027}
+
+.tree-inner[data-tree-type="civic"] .tree-card.descendant,.tree-inner[data-tree-type="civic"] .tree-card.descendant:hover{background:linear-gradient(135deg,#235d39,#173b2a);border-color:#86df9b;border-left-color:#86df9b;box-shadow:0 0 0 1px #86df9b55}
+.tree-inner[data-tree-type="civic"] .tree-card.descendant .tree-route-tag{color:#d9f7dd;background:#173b2a}
+.tree-legend[data-tree-type="civic"] .legend-after{color:#86df9b}
