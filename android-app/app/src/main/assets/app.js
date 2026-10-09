@@ -152,8 +152,26 @@ let resourceTypeFilter = "全部";
 let cityStateTypeFilter = "全部";
 let detailOpen = false;
 let warriorLine = new Set();
+let pocketPage = "home";
+let treeLayout = "list";
+let treeEraFilter = "远古时代";
+let detailTrail = [];
+let recentEntries = [];
+const moduleSelections = {};
+const POCKET_MODULES = [
+  {view:"tech",icon:"◇",title:"科技树",description:"研究与解锁"},
+  {view:"civic",icon:"▧",title:"文化树",description:"市政与政策"},
+  {view:"wonder",icon:"✦",title:"奇观",description:"效果与建造"},
+  {view:"map",icon:"◈",title:"地图",description:"地形与资源"},
+  {view:"unlock",icon:"⬡",title:"其他解锁",description:"单位与建筑"},
+  {view:"leader",icon:"♛",title:"领袖",description:"文明与能力"},
+  {view:"citystate",icon:"▥",title:"城邦",description:"使者与宗主国"},
+  {view:"greatperson",icon:"✧",title:"伟人",description:"能力与巨作"},
+  {view:"concept",icon:"☷",title:"游戏机制",description:"胜利与玩法"}
+];
 
 const $ = (selector) => document.querySelector(selector);
+const isPocket = () => matchMedia("(max-width: 790px)").matches;
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
 const typeForCategory = category => ({technologies:"tech",civics:"civic",wonders:"wonder",units:"unlock",buildings:"unlock",districts:"unlock",improvements:"unlock",governments:"unlock",greatpeople:"greatperson",leaders:"leader",features:"feature",resources:"resource",citystates:"citystate"}[category]);
 const unlockCategoryName = category => UNLOCK_CATEGORIES.find(item=>item.id===category)?.label ?? category;
@@ -182,10 +200,79 @@ function revealCard(type,id) {
   card?.scrollIntoView({block:"center",inline:"center",behavior:"instant"});
 }
 
+function rememberEntry(type,id) {
+  recentEntries=[{type,id},...recentEntries.filter(entry=>entry.type!==type||entry.id!==id)].slice(0,24);
+  try { localStorage.setItem("civ6-recent",JSON.stringify(recentEntries)); } catch {}
+}
+function navigationSnapshot() {
+  return {view,selected:{...selected},pocketPage,query,eraFilter,leaderCivFilter,gpTypeFilter,gpEraFilter,unlockCategoryFilter,unlockGroupFilter,mapKindFilter,resourceTypeFilter,cityStateTypeFilter,treeEraFilter,detail:detailOpen,scrollY:window.scrollY};
+}
+function selectModule(target) {
+  if (!POCKET_MODULES.some(module=>module.view===target)) return;
+  if (selected.id) moduleSelections[view]={...selected};
+  view=target;pocketPage="module";query="";$("#search").value="";
+  selected=moduleSelections[target]||{type:target,id:items(target)[0]?.id};
+  closeDetail();
+  history.replaceState(null,"",location.pathname+location.search);
+  render();window.scrollTo({top:0,behavior:"instant"});
+}
+function showPocketPage(page) {
+  if (!["home","recent","search"].includes(page)) return;
+  pocketPage=page;query="";$("#search").value="";closeDetail();render();
+  window.scrollTo({top:0,behavior:"instant"});
+  if(page==="search") $("#search").focus();
+}
+function pocketBack() {
+  if(detailOpen) {
+    const previous=detailTrail.pop();
+    if(previous) {
+      ({view,selected,pocketPage,query,eraFilter,leaderCivFilter,gpTypeFilter,gpEraFilter,unlockCategoryFilter,unlockGroupFilter,mapKindFilter,resourceTypeFilter,cityStateTypeFilter,treeEraFilter}=previous);
+      $("#search").value=query;
+      history.replaceState(null,"",`#${selected.type}/${encodeURIComponent(selected.id)}`);
+      closeDetail(false);render();
+      if(previous.detail)openDetail();
+      else window.scrollTo({top:previous.scrollY,behavior:"instant"});
+    } else closeDetail();
+    return true;
+  }
+  if(isPocket()&&pocketPage!=="home") {showPocketPage("home");return true;}
+  return false;
+}
+function renderPocketChrome() {
+  document.body.dataset.pocketPage=pocketPage;
+  $("#pocket-title").textContent=pocketPage==="module"?META[view].title:pocketPage==="recent"?"最近查阅":pocketPage==="search"?"搜索百科":"文明 6 口袋百科";
+  $("#pocket-back").hidden=pocketPage!=="module";
+  document.querySelectorAll(".pocket-nav button").forEach(button=>{
+    const active=button.dataset.pocketPage===(pocketPage==="module"?"home":pocketPage);
+    button.classList.toggle("active",active);button.setAttribute("aria-current",active?"page":"false");
+  });
+}
+function renderPocketHome() {
+  const modules=POCKET_MODULES.map(module=>{
+    const count=module.view==="map"?items("feature").length+items("resource").length:items(module.view).length;
+    const tone=module.view==="map"?"terrainGreen":module.view==="citystate"?"diplomatic":module.view==="unlock"?"naval":module.view;
+    return `<button type="button" class="pocket-module" ${toneStyle(tone,{})} data-view="${module.view}"><span class="pocket-module-icon" aria-hidden="true">${module.icon}</span><strong>${module.title}</strong><span>${module.description}</span><small>${count} 个条目</small></button>`;
+  }).join("");
+  const recent=recentEntries.slice(0,3).map(entry=>`<button type="button" class="pocket-recent-chip" data-open="${entry.type}:${esc(entry.id)}">${esc(getName(entry.type,entry.id))}<span>›</span></button>`).join("");
+  $("#pocket-home").innerHTML=`<button type="button" class="pocket-search-launch" data-pocket-page="search"><span aria-hidden="true">⌕</span>搜索科技、资源、领袖…<small>全站搜索</small></button><div class="pocket-home-heading"><h2>百科分类</h2><p>选择一个栏目开始查阅</p></div><div class="pocket-module-grid">${modules}</div>${recent?`<section class="pocket-home-recent"><div class="pocket-home-heading"><h2>最近查阅</h2><button type="button" data-pocket-page="recent">查看全部 ›</button></div>${recent}</section>`:""}<p class="pocket-attribution">风云变幻规则集 · 含 DLC<br>资料依据文明百科整理</p>`;
+}
+function renderRecent() {
+  $("#section-title").textContent="最近查阅";$("#section-kicker").textContent="继续阅读";
+  $("#section-count").textContent=`${recentEntries.length} 个条目`;
+  $("#workspace").innerHTML=recentEntries.length?`<div class="grid-list">${recentEntries.map(entry=>searchCard(entry.type,findItem(entry.type,entry.id))).join("")}</div>`:`<div class="pocket-empty"><span aria-hidden="true">◷</span><h3>还没有查阅记录</h3><p>打开词条后，它会出现在这里。</p><button type="button" class="pocket-primary" data-pocket-page="home">浏览百科</button></div>`;
+}
+function renderSearchStart() {
+  $("#section-title").textContent="搜索百科";$("#section-kicker").textContent="按名称、效果或解锁内容查找";$("#section-count").textContent="";
+  $("#workspace").innerHTML=`<div class="pocket-search-hints"><h3>试试这些关键词</h3><div class="chip-list">${["鹿","石油","政策卡","文化胜利","罗马"].map(word=>`<button type="button" class="chip" data-search-word="${word}">${word}</button>`).join("")}</div></div>`;
+}
+
 function setSelection(type,id,openOnMobile=true) {
   const item=findItem(type,id);
   if (!META[type] || !item) return;
-  if (detailOpen) closeDetail();
+  if (detailOpen) detailTrail.push(navigationSnapshot());
+  else detailTrail=isPocket()&&pocketPage!=="module"?[navigationSnapshot()]:[];
+  pocketPage="module";
+  if ((type==="tech"||type==="civic")&&treeEraFilter!=="全部"&&treeEraFilter!==item.era) treeEraFilter=item.era;
   if (type==="feature") mapKindFilter=item.kind;
   if (type==="resource") {
     mapKindFilter="资源";
@@ -204,6 +291,7 @@ function setSelection(type,id,openOnMobile=true) {
   }
   view = viewForType(type);
   selected = {type,id};
+  rememberEntry(type,id);
   query = "";
   $("#search").value = "";
   history.replaceState(null,"",`#${type}/${encodeURIComponent(id)}`);
@@ -214,20 +302,35 @@ function setSelection(type,id,openOnMobile=true) {
 function openDetail() {
   detailOpen = true;
   $("#detail").classList.add("open");
+  $("#detail").setAttribute("aria-hidden","false");
+  $("#detail").setAttribute("aria-modal",String(isPocket()));
   $("#detail-backdrop").hidden = false;
   document.body.style.overflow = "hidden";
   $("#detail").scrollTop = 0;
   $("#detail-close")?.focus();
 }
-function closeDetail() {
+function closeDetail(clearTrail=true) {
   detailOpen = false;
   $("#detail").classList.remove("open");
+  $("#detail").setAttribute("aria-hidden",String(isPocket()));
+  $("#detail").setAttribute("aria-modal","false");
   $("#detail-backdrop").hidden = true;
   document.body.style.overflow = "";
+  if(clearTrail)detailTrail=[];
 }
 
 function render() {
   if (!db) return;
+  renderPocketChrome();
+  $("#detail").setAttribute("role",isPocket()?"dialog":"complementary");
+  $("#detail").setAttribute("aria-hidden",String(isPocket()&&!detailOpen));
+  const home=isPocket()&&pocketPage==="home";
+  $("#pocket-home").hidden=!home;
+  $(".section-head").hidden=home;
+  $(".content-layout").hidden=home;
+  if(home){renderPocketHome();return;}
+  if(isPocket()&&pocketPage==="recent"){renderRecent();renderDetail();return;}
+  if(isPocket()&&pocketPage==="search"&&!query){renderSearchStart();renderDetail();return;}
   document.querySelectorAll(".tabs button").forEach(button => {
     const active = button.dataset.view === view && !query;
     button.classList.toggle("active",active);
@@ -259,13 +362,22 @@ function ancestorIds(type,id,seen=new Set()) {
 
 function renderTree() {
   const list = items(view);
+  const layoutControl=`<div class="pocket-tree-controls"><div class="pocket-segment" aria-label="研究路线显示方式">${[["list","按时代"],["tree","树状图"]].map(([layout,label])=>`<button type="button" data-tree-layout="${layout}" aria-pressed="${treeLayout===layout}" class="${treeLayout===layout?"active":""}">${label}</button>`).join("")}</div></div>`;
+  if(isPocket()&&treeLayout==="list") {
+    const eras=["全部",...ERA_ORDER.filter(era=>list.some(item=>item.era===era))];
+    const filtered=list.filter(item=>treeEraFilter==="全部"||item.era===treeEraFilter);
+    if(selected.type!==view||!filtered.some(item=>item.id===selected.id))selected={type:view,id:filtered[0]?.id};
+    $("#section-count").textContent=`${filtered.length} / ${list.length} 项`;
+    $("#workspace").innerHTML=`${layoutControl}<div class="select-filter"><label for="tree-era-filter">时代</label><select id="tree-era-filter">${eras.map(era=>`<option value="${esc(era)}" ${treeEraFilter===era?"selected":""}>${esc(era)}</option>`).join("")}</select></div><div class="pocket-research-list">${filtered.map(item=>`<button type="button" class="item-card pocket-research-card ${selected.id===item.id?"selected":""}" ${toneStyle(view,item)} data-open="${view}:${esc(item.id)}"><div class="item-card-heading">${entryImage(item)}<div><h3>${esc(item.name)}</h3><span>${item.cost||"—"} ${view==="tech"?"科技值":"文化值"} · ${esc(item.era)}</span></div><span class="pocket-card-arrow">›</span></div><p>${esc(item.boost?`${view==="tech"?"尤里卡":"鼓舞"}：${item.boost}`:"起始研究，无提升条件")}</p><div class="pocket-research-unlocks">${esc(preview(item.unlocks.map(unlock=>unlock.name).join(" · ")||"查看研究前置",65))}</div></button>`).join("")}</div>`;
+    return;
+  }
   const activeId = selected.type === view ? selected.id : list[0]?.id;
   if (selected.type !== view) selected = {type:view,id:activeId};
   const ancestors = ancestorIds(view,activeId);
   const oldScroll = $(".tree-scroll")?.scrollLeft ?? 0;
   const groups = ERA_ORDER.map(era => ({era,entries:list.filter(item => item.era === era)})).filter(group => group.entries.length);
   $("#section-count").textContent = `${list.length} 项 · 点击节点查看前置与解锁`;
-  $("#workspace").innerHTML = `<p class="summary-note">沿时代横向浏览；选择节点可高亮其研究前置。</p><div class="tree-scroll"><div class="tree-inner"><svg class="tree-edges" aria-hidden="true"></svg>${groups.map(group => `<div class="tree-column"><div class="tree-era">${esc(group.era)} <small>${group.entries.length} 项</small></div>${group.entries.map(item => {
+  $("#workspace").innerHTML = `${isPocket()?layoutControl:""}<p class="summary-note">沿时代横向浏览；选择节点可高亮其研究前置。</p><div class="tree-scroll"><div class="tree-inner"><svg class="tree-edges" aria-hidden="true"></svg>${groups.map(group => `<div class="tree-column"><div class="tree-era">${esc(group.era)} <small>${group.entries.length} 项</small></div>${group.entries.map(item => {
     const wonders = item.unlocks.filter(unlock => unlock.category === "wonders" && unlock.id.startsWith("building_"));
     return `<button type="button" class="tree-card ${item.id===activeId?"selected":ancestors.has(item.id)?"ancestor":""}" ${toneStyle(view,item)} data-open="${view}:${esc(item.id)}" data-id="${esc(item.id)}"><span class="tree-card-title"><span class="tree-card-heading">${entryImage(item)}<span>${esc(item.name)}</span></span><span class="chev">›</span></span><span class="tree-card-meta">${item.cost ? `${item.cost} ${view==="tech"?"科技值":"文化值"}` : "研究项目"}${item.boost ? ` · ${esc(preview(item.boost,18))}` : ""}</span>${wonders.length ? `<span class="tree-card-unlock">✦ ${esc(wonders.map(x=>x.name).join(" · "))}</span>` : ""}</button>`;
   }).join("")}</div>`).join("")}</div></div>`;
@@ -523,12 +635,19 @@ function renderDetail() {
     body += detailSection("实战提示",`<p>${esc(item.tip)}</p>`);
   }
   const heroImage=["tech","civic","wonder","feature","resource","citystate"].includes(selected.type)?entryImage(item):"";
-  $("#detail").innerHTML=`<div class="detail-content" ${toneStyle(selected.type,item)}><div class="detail-intro"><div class="detail-header"><span class="detail-type">${esc(META[selected.type].label)}</span><button id="detail-close" type="button" class="detail-close" aria-label="关闭详情">×</button></div><div class="detail-title-row">${heroImage}<div><h2 class="detail-title">${esc(item.name)}</h2><p class="detail-sub">${esc(subtitle)}</p></div></div></div><div class="detail-body">${body}<p class="detail-source">资料依据：文明百科 · 风云变幻规则集</p></div></div>`;
+  $("#detail").innerHTML=`<div class="detail-content" ${toneStyle(selected.type,item)}><div class="detail-intro"><div class="detail-header"><button id="detail-close" type="button" class="detail-close" aria-label="返回上一页">‹ <span>返回</span></button><span class="detail-type">${esc(META[selected.type].label)}</span><span class="detail-signature">Applespriter</span></div><div class="detail-title-row">${heroImage}<div><h2 class="detail-title">${esc(item.name)}</h2><p class="detail-sub">${esc(subtitle)}</p></div></div></div><div class="detail-body">${body}<p class="detail-source">资料依据：文明百科 · 风云变幻规则集</p></div></div>`;
 }
 
 document.addEventListener("click",event=>{
+  const pocketNav=event.target.closest("button[data-pocket-page]");
+  if(pocketNav){showPocketPage(pocketNav.dataset.pocketPage);return;}
+  if(event.target.closest("[data-pocket-back]")){showPocketPage("home");return;}
+  const searchWord=event.target.closest("[data-search-word]");
+  if(searchWord){query=searchWord.dataset.searchWord;$("#search").value=query;render();return;}
+  const layout=event.target.closest("[data-tree-layout]");
+  if(layout){treeLayout=layout.dataset.treeLayout;closeDetail();render();return;}
   const tab=event.target.closest("[data-view]");
-  if (tab) {view=tab.dataset.view;query="";$("#search").value="";selected={type:view,id:items(view)[0]?.id};closeDetail();render();return;}
+  if (tab) {selectModule(tab.dataset.view);return;}
   const era=event.target.closest("[data-era]");
   if (era) {eraFilter=era.dataset.era;render();return;}
   const gpType=event.target.closest("[data-gp-type]");
@@ -543,29 +662,35 @@ document.addEventListener("click",event=>{
   if (cityStateType) {cityStateTypeFilter=cityStateType.dataset.citystateType;closeDetail();render();return;}
   const open=event.target.closest("[data-open]");
   if (open) {const [type,id]=open.dataset.open.split(":");setSelection(type,id);return;}
-  if (event.target.closest("#detail-close") || event.target.closest("#detail-backdrop")) closeDetail();
+  if (event.target.closest("#detail-close")) {pocketBack();return;}
+  if (event.target.closest("#detail-backdrop")) closeDetail();
 });
 document.addEventListener("change",event=>{
+  if(event.target.id==="tree-era-filter"){treeEraFilter=event.target.value;closeDetail();render();}
   if (event.target.id==="leader-civ-filter") {leaderCivFilter=event.target.value;closeDetail();render();}
   if (event.target.id==="gp-era-filter") {gpEraFilter=event.target.value;closeDetail();render();}
   if (event.target.id==="unlock-group-filter") {unlockGroupFilter=event.target.value;closeDetail();render();}
 });
-document.addEventListener("keydown",event=>{if(event.key==="Escape") closeDetail();});
-$("#search").addEventListener("input",event=>{query=event.target.value.trim();closeDetail();render();});
-window.addEventListener("resize",()=>{if(matchMedia("(min-width: 791px)").matches && detailOpen) closeDetail();if(view==="tech"||view==="civic") requestAnimationFrame(()=>drawEdges(view,ancestorIds(view,selected.id)));});
+document.addEventListener("keydown",event=>{if(event.key==="Escape") pocketBack();});
+$("#search").addEventListener("input",event=>{query=event.target.value.trim();if(isPocket())pocketPage="search";closeDetail();render();});
+let pocketWidth=isPocket();
+window.addEventListener("resize",()=>{const phone=isPocket();if(phone!==pocketWidth){pocketWidth=phone;closeDetail();render();}else if(view==="tech"||view==="civic")requestAnimationFrame(()=>drawEdges(view,ancestorIds(view,selected.id)));});
 window.addEventListener("hashchange",()=>{const [type,id]=location.hash.slice(1).split("/");if(META[type]&&findItem(type,decodeURIComponent(id||"")))setSelection(type,decodeURIComponent(id),false);});
 
 fetch("./data.json").then(response=>{if(!response.ok)throw new Error(`HTTP ${response.status}`);return response.json()}).then(data=>{
   db=data;
   warriorLine=buildWarriorLine();
+  try {recentEntries=JSON.parse(localStorage.getItem("civ6-recent")||"[]").filter(entry=>findItem(entry.type,entry.id)).slice(0,24);}catch{recentEntries=[];}
   const [type,rawId]=location.hash.slice(1).split("/");
   const id=decodeURIComponent(rawId||"");
   if(META[type]&&findItem(type,id)){
     view=viewForType(type);
+    pocketPage="module";
     selected={type,id};
     if(type==="unlock")unlockCategoryFilter=findItem(type,id).category;
     if(type==="feature")mapKindFilter=findItem(type,id).kind;
     if(type==="resource")mapKindFilter="资源";
+    if(type==="tech"||type==="civic")treeEraFilter=findItem(type,id).era;
   }
   render();
 }).catch(error=>{console.error(error);$("#error").hidden=false;$("#workspace").innerHTML="";$("#section-count").textContent="";});

@@ -5,7 +5,7 @@
 ## 工程与兼容性
 
 - Bundle ID：`com.applespriter.civ6pocket`。
-- 手机、平板；工程配置的最低兼容版本为 HarmonyOS 5.0（API 12），使用本机 HarmonyOS 7 / API 26 SDK 编译。由于尚未连接真机，目前只验证了编译和 HAP 内资源。
+- 手机、平板；工程配置的最低兼容版本为 HarmonyOS 5.0（API 12），使用本机 HarmonyOS 7 / API 26 SDK 编译。1.1.0 调试版已在连接设备上安装和启动，九个模块的手机页面、筛选及返回逻辑已检查。
 - `entry/src/main/resources/rawfile/web/` 是离线网页资源；ArkWeb 拦截应用内部的虚拟 HTTPS 地址，返回本地 HTML、JavaScript、CSS、JSON 和图标，不依赖网站服务器。
 - 页面导航限定在应用内部，不需要网络权限。游戏规则与图标的来源见项目根目录 [README](../README.md)。
 
@@ -33,3 +33,9 @@ JAVA_HOME=/Applications/DevEco-Studio.app/Contents/jbr/Contents/Home \
 ```
 
 未配置签名时，编译产物是 `entry/build/default/outputs/default/entry-default-unsigned.hap`，不能直接安装到真机。真机安装需要连接设备，并在 DevEco Studio 为本应用配置对应设备与 Bundle ID 的调试签名。证书、签名密码和签名配置不应提交到公开仓库。
+
+## 1.1.0 手机界面
+
+手机端采用分类首页、独立模块页、全屏详情页和底部百科／最近／搜索导航。科技与市政默认按时代查看，可切换树状图；从关联词条返回时恢复此前筛选。鸿蒙返回手势优先返回词条或分类首页。窗口和系统导航栏统一使用深色背景，网页横向滚动条不显示白色轨道。
+
+自动签名生成完成后，还需确认工程级 `build-profile.json5` 的 `app.products` 中，当前产品具有 `"signingConfig": "default"`，并与 `signingConfigs` 中的名称一致。签名材料应只保留在本机。

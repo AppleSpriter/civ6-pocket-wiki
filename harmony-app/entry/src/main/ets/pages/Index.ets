@@ -1,4 +1,5 @@
 import { webview } from '@kit.ArkWeb';
+import { common } from '@kit.AbilityKit';
 
 const LOCAL_ORIGIN: string = 'https://civ6-pocket.invalid/';
 
@@ -6,6 +7,16 @@ const LOCAL_ORIGIN: string = 'https://civ6-pocket.invalid/';
 @Component
 struct Index {
   private controller: webview.WebviewController = new webview.WebviewController();
+
+  onBackPress(): boolean {
+    this.controller.runJavaScript('typeof pocketBack === "function" && pocketBack()').then((handled: string) => {
+      if (handled !== 'true') {
+        const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+        context.moveAbilityToBackground().catch(() => console.error('Unable to move encyclopedia to background'));
+      }
+    }).catch(() => console.error('Unable to handle encyclopedia back navigation'));
+    return true;
+  }
 
   private localResource(url: string): WebResourceResponse {
     const path: string = url.startsWith(LOCAL_ORIGIN) ? url.substring(LOCAL_ORIGIN.length).split(/[?#]/)[0] : '';
@@ -45,6 +56,7 @@ struct Index {
         .fileAccess(false)
         .imageAccess(true)
         .onlineImageAccess(true)
+        .backgroundColor('#0B202B')
         .onInterceptRequest((event) => this.localResource(event.request.getRequestUrl()))
         .onOverrideUrlLoading((request) => !request.getRequestUrl().startsWith(LOCAL_ORIGIN))
         .width('100%')
@@ -53,5 +65,6 @@ struct Index {
     .width('100%')
     .height('100%')
     .backgroundColor('#0B202B')
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
   }
 }

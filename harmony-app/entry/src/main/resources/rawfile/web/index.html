@@ -11,6 +11,13 @@
   <script src="./app.js" defer></script>
 </head>
 <body>
+  <header class="pocket-appbar">
+    <button type="button" id="pocket-back" class="pocket-icon-button" data-pocket-back aria-label="返回分类" hidden>‹</button>
+    <span class="pocket-logo" aria-hidden="true">VI</span>
+    <h1 id="pocket-title">文明 6 口袋百科</h1>
+    <span class="pocket-signature">Applespriter</span>
+    <button type="button" class="pocket-icon-button" data-pocket-page="search" aria-label="打开搜索">⌕</button>
+  </header>
   <div class="app-shell">
     <header class="topbar">
       <div class="brand"><span class="brand-mark" aria-hidden="true">VI</span><span>文明 6 <b>口袋百科</b></span></div>
@@ -18,6 +25,7 @@
       <span class="edition">风云变幻规则集 · 含 DLC</span>
     </header>
     <main>
+      <section id="pocket-home" class="pocket-home" aria-label="百科首页" hidden></section>
       <section class="toolbar" aria-label="查找百科条目">
         <div class="toolbar-copy"><p class="eyebrow">CIVILIZATION VI / FIELD GUIDE</p><h1>查解锁、看前置、定路线。</h1></div>
         <label class="search-field"><span class="search-icon" aria-hidden="true">⌕</span><span class="sr-only">搜索百科</span><input id="search" type="search" placeholder="搜索科技、奇观、单位、政策卡…" autocomplete="off"></label>
@@ -43,5 +51,10 @@
     <footer>资料依据文明百科的“风云变幻”规则集整理。游戏速度、资料片与模式会影响实际数值。<span class="footer-signature">制作：Applespriter</span></footer>
   </div>
   <div id="detail-backdrop" class="detail-backdrop" hidden></div>
+  <nav class="pocket-nav" aria-label="手机导航">
+    <button type="button" data-pocket-page="home" aria-label="百科首页"><span aria-hidden="true">▦</span>百科</button>
+    <button type="button" data-pocket-page="recent" aria-label="最近查阅"><span aria-hidden="true">◷</span>最近</button>
+    <button type="button" data-pocket-page="search" aria-label="搜索百科"><span aria-hidden="true">⌕</span>搜索</button>
+  </nav>
 </body>
 </html>
