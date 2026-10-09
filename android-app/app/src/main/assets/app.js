@@ -155,6 +155,11 @@ let warriorLine = new Set();
 let pocketPage = "home";
 let treeLayout = "list";
 let treeEraFilter = "远古时代";
+let treeFocus = {tech:null,civic:null};
+let treePress = null;
+let ignoredTreeClick = null;
+const TREE_HOLD_MS = 550;
+const TREE_MOVE_TOLERANCE = 10;
 let detailTrail = [];
 let recentEntries = [];
 const moduleSelections = {};
@@ -205,7 +210,7 @@ function rememberEntry(type,id) {
   try { localStorage.setItem("civ6-recent",JSON.stringify(recentEntries)); } catch {}
 }
 function navigationSnapshot() {
-  return {view,selected:{...selected},pocketPage,query,eraFilter,leaderCivFilter,gpTypeFilter,gpEraFilter,unlockCategoryFilter,unlockGroupFilter,mapKindFilter,resourceTypeFilter,cityStateTypeFilter,treeEraFilter,detail:detailOpen,scrollY:window.scrollY};
+  return {view,selected:{...selected},pocketPage,query,eraFilter,leaderCivFilter,gpTypeFilter,gpEraFilter,unlockCategoryFilter,unlockGroupFilter,mapKindFilter,resourceTypeFilter,cityStateTypeFilter,treeEraFilter,treeFocus:{...treeFocus},detail:detailOpen,scrollY:window.scrollY};
 }
 function selectModule(target) {
   if (!POCKET_MODULES.some(module=>module.view===target)) return;
@@ -226,7 +231,7 @@ function pocketBack() {
   if(detailOpen) {
     const previous=detailTrail.pop();
     if(previous) {
-      ({view,selected,pocketPage,query,eraFilter,leaderCivFilter,gpTypeFilter,gpEraFilter,unlockCategoryFilter,unlockGroupFilter,mapKindFilter,resourceTypeFilter,cityStateTypeFilter,treeEraFilter}=previous);
+      ({view,selected,pocketPage,query,eraFilter,leaderCivFilter,gpTypeFilter,gpEraFilter,unlockCategoryFilter,unlockGroupFilter,mapKindFilter,resourceTypeFilter,cityStateTypeFilter,treeEraFilter,treeFocus}=previous);
       $("#search").value=query;
       history.replaceState(null,"",`#${selected.type}/${encodeURIComponent(selected.id)}`);
       closeDetail(false);render();
@@ -266,7 +271,7 @@ function renderSearchStart() {
   $("#workspace").innerHTML=`<div class="pocket-search-hints"><h3>试试这些关键词</h3><div class="chip-list">${["鹿","石油","政策卡","文化胜利","罗马"].map(word=>`<button type="button" class="chip" data-search-word="${word}">${word}</button>`).join("")}</div></div>`;
 }
 
-function setSelection(type,id,openOnMobile=true) {
+function setSelection(type,id,openOnMobile=true,reveal=true) {
   const item=findItem(type,id);
   if (!META[type] || !item) return;
   if (detailOpen) detailTrail.push(navigationSnapshot());
@@ -296,7 +301,7 @@ function setSelection(type,id,openOnMobile=true) {
   $("#search").value = "";
   history.replaceState(null,"",`#${type}/${encodeURIComponent(id)}`);
   render();
-  requestAnimationFrame(()=>{revealCard(type,id);if(openOnMobile&&matchMedia("(max-width: 790px)").matches)openDetail();});
+  requestAnimationFrame(()=>{if(reveal)revealCard(type,id);if(openOnMobile&&matchMedia("(max-width: 790px)").matches)openDetail();});
 }
 
 function openDetail() {
@@ -360,6 +365,59 @@ function ancestorIds(type,id,seen=new Set()) {
   return seen;
 }
 
+function descendantIds(type,id) {
+  const children=new Map();
+  for(const item of items(type)) for(const parent of item.prereq) {
+    if(!children.has(parent))children.set(parent,[]);
+    children.get(parent).push(item.id);
+  }
+  const seen=new Set([id]),descendants=new Set(),pending=[id];
+  while(pending.length) {
+    const parent=pending.pop();
+    for(const child of children.get(parent)||[]) {
+      if(seen.has(child))continue;
+      seen.add(child);descendants.add(child);pending.push(child);
+    }
+  }
+  return descendants;
+}
+function treeRelations(type) {
+  const focus=treeFocus[type];
+  if(!focus||!findItem(type,focus))return {focus:null,ancestors:new Set(),descendants:new Set()};
+  const ancestors=ancestorIds(type,focus);ancestors.delete(focus);
+  return {focus,ancestors,descendants:descendantIds(type,focus)};
+}
+function updateTreeHighlight(type) {
+  const relations=treeRelations(type);
+  for(const card of document.querySelectorAll('.tree-card[data-tree-node]')) {
+    const id=card.dataset.id;
+    card.classList.toggle('selected',id===relations.focus);
+    card.classList.toggle('ancestor',relations.ancestors.has(id));
+    card.classList.toggle('descendant',relations.descendants.has(id));
+    card.setAttribute('aria-pressed',String(id===relations.focus));
+  }
+  const status=$('#tree-status');
+  if(status)status.textContent=relations.focus?`${getName(type,relations.focus)} · ${relations.ancestors.size} 项前置 · ${relations.descendants.size} 项后续`:"尚未选中路线";
+  drawEdges(type,relations);
+}
+function toggleTreeNode(type,id) {
+  treeFocus[type]=treeFocus[type]===id?null:id;
+  updateTreeHighlight(type);
+}
+function openTreeDetail(type,id) {
+  treeFocus[type]=id;
+  setSelection(type,id,true,false);
+}
+function cancelTreePress() {
+  if(treePress)clearTimeout(treePress.timer);
+  treePress=null;
+}
+function moveTreePress() {
+  if(!treePress)return;
+  clearTimeout(treePress.timer);
+  treePress.moved=true;
+}
+
 function renderTree() {
   const list = items(view);
   const layoutControl=`<div class="pocket-tree-controls"><div class="pocket-segment" aria-label="研究路线显示方式">${[["list","按时代"],["tree","树状图"]].map(([layout,label])=>`<button type="button" data-tree-layout="${layout}" aria-pressed="${treeLayout===layout}" class="${treeLayout===layout?"active":""}">${label}</button>`).join("")}</div></div>`;
@@ -373,20 +431,21 @@ function renderTree() {
   }
   const activeId = selected.type === view ? selected.id : list[0]?.id;
   if (selected.type !== view) selected = {type:view,id:activeId};
-  const ancestors = ancestorIds(view,activeId);
   const oldScroll = $(".tree-scroll")?.scrollLeft ?? 0;
+  const oldScrollTop = $(".tree-scroll")?.scrollTop ?? 0;
   const groups = ERA_ORDER.map(era => ({era,entries:list.filter(item => item.era === era)})).filter(group => group.entries.length);
-  $("#section-count").textContent = `${list.length} 项 · 点击节点查看前置与解锁`;
-  $("#workspace").innerHTML = `${isPocket()?layoutControl:""}<p class="summary-note">沿时代横向浏览；选择节点可高亮其研究前置。</p><div class="tree-scroll"><div class="tree-inner"><svg class="tree-edges" aria-hidden="true"></svg>${groups.map(group => `<div class="tree-column"><div class="tree-era">${esc(group.era)} <small>${group.entries.length} 项</small></div>${group.entries.map(item => {
+  $("#section-count").textContent = `${list.length} 项研究路线`;
+  $("#workspace").innerHTML = `${isPocket()?layoutControl:""}<p id="tree-help" class="summary-note">点按高亮前置和后续路线，再点同一节点取消；长按查看详情。</p><div class="tree-legend" aria-label="路线颜色说明"><span class="legend-current">当前节点</span><span class="legend-before">前置</span><span class="legend-after">后续</span></div><p id="tree-status" class="tree-status" aria-live="polite">尚未选中路线</p><div class="tree-scroll"><div class="tree-inner"><svg class="tree-edges" aria-hidden="true"></svg>${groups.map(group => `<div class="tree-column"><div class="tree-era">${esc(group.era)} <small>${group.entries.length} 项</small></div>${group.entries.map(item => {
     const wonders = item.unlocks.filter(unlock => unlock.category === "wonders" && unlock.id.startsWith("building_"));
-    return `<button type="button" class="tree-card ${item.id===activeId?"selected":ancestors.has(item.id)?"ancestor":""}" ${toneStyle(view,item)} data-open="${view}:${esc(item.id)}" data-id="${esc(item.id)}"><span class="tree-card-title"><span class="tree-card-heading">${entryImage(item)}<span>${esc(item.name)}</span></span><span class="chev">›</span></span><span class="tree-card-meta">${item.cost ? `${item.cost} ${view==="tech"?"科技值":"文化值"}` : "研究项目"}${item.boost ? ` · ${esc(preview(item.boost,18))}` : ""}</span>${wonders.length ? `<span class="tree-card-unlock">✦ ${esc(wonders.map(x=>x.name).join(" · "))}</span>` : ""}</button>`;
+    return `<button type="button" class="tree-card" ${toneStyle(view,item)} data-tree-node="${view}:${esc(item.id)}" data-open="${view}:${esc(item.id)}" data-id="${esc(item.id)}" aria-pressed="false" aria-describedby="tree-help" aria-keyshortcuts="Alt+Enter"><span class="tree-card-title"><span class="tree-card-heading">${entryImage(item)}<span>${esc(item.name)}</span></span><span class="chev">›</span></span><span class="tree-card-meta">${item.cost ? `${item.cost} ${view==="tech"?"科技值":"文化值"}` : "研究项目"}${item.boost ? ` · ${esc(preview(item.boost,18))}` : ""}</span>${wonders.length ? `<span class="tree-card-unlock">✦ ${esc(wonders.map(x=>x.name).join(" · "))}</span>` : ""}</button>`;
   }).join("")}</div>`).join("")}</div></div>`;
   const scroll = $(".tree-scroll");
   scroll.scrollLeft = oldScroll;
-  requestAnimationFrame(() => drawEdges(view,ancestors));
+  scroll.scrollTop = oldScrollTop;
+  requestAnimationFrame(() => updateTreeHighlight(view));
 }
 
-function drawEdges(type,ancestors) {
+function drawEdges(type,relations=treeRelations(type)) {
   const inner = $(".tree-inner");
   const svg = $(".tree-edges");
   if (!inner || !svg || (view !== "tech" && view !== "civic")) return;
@@ -395,17 +454,19 @@ function drawEdges(type,ancestors) {
   svg.setAttribute("height",String(inner.scrollHeight));
   svg.setAttribute("viewBox",`0 0 ${inner.scrollWidth} ${inner.scrollHeight}`);
   const nodes = new Map([...inner.querySelectorAll(".tree-card")].map(node => [node.dataset.id,node]));
-  const active = new Set([...ancestors,selected.id]);
   const paths = [];
   for (const item of items(type)) for (const parentId of item.prereq) {
     const parent = nodes.get(parentId), child = nodes.get(item.id);
     if (!parent || !child) continue;
     const p=parent.getBoundingClientRect(),c=child.getBoundingClientRect();
-    if (c.left <= p.right + 3) continue;
-    const x1=p.right-rect.left,y1=p.top-rect.top+p.height/2,x2=c.left-rect.left,y2=c.top-rect.top+c.height/2;
-    const mid=(x1+x2)/2;
-    const highlighted = active.has(parentId) && active.has(item.id);
-    paths.push(`<path d="M${x1.toFixed(1)} ${y1.toFixed(1)} C${mid.toFixed(1)} ${y1.toFixed(1)},${mid.toFixed(1)} ${y2.toFixed(1)},${x2.toFixed(1)} ${y2.toFixed(1)}" fill="none" stroke="${highlighted?"#dec17d":"#77979b"}" stroke-width="${highlighted?2.2:1.2}" opacity="${highlighted?.78:.23}"/>`);
+    if(parent===child)continue;
+    const sameColumn=parent.closest('.tree-column')===child.closest('.tree-column');
+    const x1=p.right-rect.left,y1=p.top-rect.top+p.height/2,x2=(sameColumn?c.right:c.left)-rect.left,y2=c.top-rect.top+c.height/2;
+    const mid=sameColumn?Math.max(x1,x2)+13:(x1+x2)/2;
+    const before=!!relations.focus&&relations.ancestors.has(parentId)&&(item.id===relations.focus||relations.ancestors.has(item.id));
+    const after=!!relations.focus&&(parentId===relations.focus||relations.descendants.has(parentId))&&relations.descendants.has(item.id);
+    const direction=before?"before":after?"after":"none";
+    paths.push(`<path data-route="${direction}" d="M${x1.toFixed(1)} ${y1.toFixed(1)} C${mid.toFixed(1)} ${y1.toFixed(1)},${mid.toFixed(1)} ${y2.toFixed(1)},${x2.toFixed(1)} ${y2.toFixed(1)}" fill="none" stroke="${before?"#77d5dc":after?"#bea7f4":"#77979b"}" stroke-width="${before||after?2.5:1.2}" opacity="${(before||after)?0.9:0.23}"/>`);
   }
   svg.innerHTML = paths.join("");
 }
@@ -638,6 +699,50 @@ function renderDetail() {
   $("#detail").innerHTML=`<div class="detail-content" ${toneStyle(selected.type,item)}><div class="detail-intro"><div class="detail-header"><button id="detail-close" type="button" class="detail-close" aria-label="返回上一页">‹ <span>返回</span></button><span class="detail-type">${esc(META[selected.type].label)}</span><span class="detail-signature">Applespriter</span></div><div class="detail-title-row">${heroImage}<div><h2 class="detail-title">${esc(item.name)}</h2><p class="detail-sub">${esc(subtitle)}</p></div></div></div><div class="detail-body">${body}<p class="detail-source">资料依据：文明百科 · 风云变幻规则集</p></div></div>`;
 }
 
+document.addEventListener('pointerdown',event=>{
+  if(!event.isPrimary){moveTreePress();return;}
+  cancelTreePress();ignoredTreeClick=null;
+  if(event.button!==0)return;
+  const node=event.target.closest('.tree-card[data-tree-node]');
+  if(!node)return;
+  const [type,id]=node.dataset.treeNode.split(':');
+  const press={node,type,id,pointerId:event.pointerId,x:event.clientX,y:event.clientY,moved:false,held:false,timer:null};
+  treePress=press;
+  press.timer=setTimeout(()=>{
+    if(treePress!==press||press.moved||!press.node.isConnected)return;
+    press.held=true;
+    ignoredTreeClick={pointerId:press.pointerId,until:performance.now()+2000};
+    openTreeDetail(press.type,press.id);
+  },TREE_HOLD_MS);
+},{passive:true});
+document.addEventListener('pointermove',event=>{
+  if(treePress&&event.pointerId===treePress.pointerId&&Math.hypot(event.clientX-treePress.x,event.clientY-treePress.y)>TREE_MOVE_TOLERANCE)moveTreePress();
+},{passive:true});
+function finishTreePress(event) {
+  if(!treePress||event.pointerId!==treePress.pointerId)return;
+  const press=treePress;cancelTreePress();
+  if(press.held||press.moved||event.type==='pointercancel')ignoredTreeClick={pointerId:press.pointerId,until:performance.now()+700};
+}
+document.addEventListener('pointerup',finishTreePress,{passive:true});
+document.addEventListener('pointercancel',finishTreePress,{passive:true});
+document.addEventListener('scroll',moveTreePress,{capture:true,passive:true});
+window.addEventListener('blur',cancelTreePress);
+window.addEventListener('pagehide',cancelTreePress);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)cancelTreePress();});
+document.addEventListener('contextmenu',event=>{if(event.target.closest('.tree-card[data-tree-node]'))event.preventDefault();});
+document.addEventListener('click',event=>{
+  if(!ignoredTreeClick||event.detail===0||performance.now()>ignoredTreeClick.until)return;
+  if('pointerId' in event&&event.pointerId!==ignoredTreeClick.pointerId)return;
+  ignoredTreeClick=null;event.preventDefault();event.stopImmediatePropagation();
+},true);
+document.addEventListener('keydown',event=>{
+  const node=event.target.closest('.tree-card[data-tree-node]');
+  if(node&&event.key==='Enter'&&(event.altKey||event.shiftKey)) {
+    event.preventDefault();cancelTreePress();
+    const [type,id]=node.dataset.treeNode.split(':');openTreeDetail(type,id);
+  }
+});
+
 document.addEventListener("click",event=>{
   const pocketNav=event.target.closest("button[data-pocket-page]");
   if(pocketNav){showPocketPage(pocketNav.dataset.pocketPage);return;}
@@ -660,6 +765,8 @@ document.addEventListener("click",event=>{
   if (resourceType) {resourceTypeFilter=resourceType.dataset.resourceType;closeDetail();render();return;}
   const cityStateType=event.target.closest("[data-citystate-type]");
   if (cityStateType) {cityStateTypeFilter=cityStateType.dataset.citystateType;closeDetail();render();return;}
+  const treeNode=event.target.closest('.tree-card[data-tree-node]');
+  if(treeNode){const [type,id]=treeNode.dataset.treeNode.split(':');toggleTreeNode(type,id);return;}
   const open=event.target.closest("[data-open]");
   if (open) {const [type,id]=open.dataset.open.split(":");setSelection(type,id);return;}
   if (event.target.closest("#detail-close")) {pocketBack();return;}
@@ -674,7 +781,7 @@ document.addEventListener("change",event=>{
 document.addEventListener("keydown",event=>{if(event.key==="Escape") pocketBack();});
 $("#search").addEventListener("input",event=>{query=event.target.value.trim();if(isPocket())pocketPage="search";closeDetail();render();});
 let pocketWidth=isPocket();
-window.addEventListener("resize",()=>{const phone=isPocket();if(phone!==pocketWidth){pocketWidth=phone;closeDetail();render();}else if(view==="tech"||view==="civic")requestAnimationFrame(()=>drawEdges(view,ancestorIds(view,selected.id)));});
+window.addEventListener("resize",()=>{const phone=isPocket();if(phone!==pocketWidth){pocketWidth=phone;closeDetail();render();}else if(view==="tech"||view==="civic")requestAnimationFrame(()=>drawEdges(view));});
 window.addEventListener("hashchange",()=>{const [type,id]=location.hash.slice(1).split("/");if(META[type]&&findItem(type,decodeURIComponent(id||"")))setSelection(type,decodeURIComponent(id),false);});
 
 fetch("./data.json").then(response=>{if(!response.ok)throw new Error(`HTTP ${response.status}`);return response.json()}).then(data=>{

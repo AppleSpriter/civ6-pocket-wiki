@@ -172,3 +172,13 @@
   .chip{padding:9px 10px}
 }
 @media(max-width:350px){.pocket-signature{display:none}.pocket-module{padding:12px 9px;min-height:122px}.pocket-module strong{font-size:14px}.pocket-module>span:not(.pocket-module-icon){font-size:9px}.pocket-search-launch small{display:none}}
+
+.tree-card{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.tree-card.selected{border-color:#f1cf83;border-left-color:#f1cf83;box-shadow:0 0 0 2px #f1cf8350,0 7px 20px #04141c50}
+.tree-card.ancestor{border-color:#77d5dc;border-left-color:#77d5dc;box-shadow:0 0 0 1px #77d5dc55}
+.tree-card.descendant{border-color:#bea7f4;border-left-color:#bea7f4;box-shadow:0 0 0 1px #bea7f455}
+.tree-legend{display:flex;align-items:center;flex-wrap:wrap;gap:14px;font-size:12px;margin:0 0 9px;color:#b9cfd2}
+.tree-legend span{display:inline-flex;align-items:center;gap:6px}
+.tree-legend span::before{content:"";width:9px;height:9px;border-radius:3px;background:currentColor}
+.legend-current{color:#f1cf83}.legend-before{color:#77d5dc}.legend-after{color:#bea7f4}
+.tree-status{font-size:12px;color:#b5cbce;margin:0 0 12px;line-height:1.5;min-height:18px}

@@ -33,3 +33,5 @@ python3 scripts/build_data.py
 只更新其他解锁条目时，可运行 `python3 scripts/build_data.py --unlocks-only`。
 只更新地图、资源与城邦条目时，可运行 `python3 scripts/build_data.py --map-only`。
 如需重新抓取科技、市政、奇观、地图和城邦图标，运行 `python3 scripts/fetch_icons.py`。脚本使用文明百科对应条目的图片，并将其保存到 `dist/images/`。
+
+科技和文化的树状图支持点按选中路线、再点取消、长按打开详情。路线高亮包含全部前置与后续节点及连线，也涵盖同一时代的研究关系；键盘 Alt+Enter 可打开详情。
